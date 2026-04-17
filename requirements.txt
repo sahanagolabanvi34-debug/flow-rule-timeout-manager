@@ -1,0 +1,6 @@
+# Flow Rule Timeout Manager
+# No third-party dependencies required.
+# Uses Python standard library only: threading, logging, time, json, uuid, dataclasses, enum
+# Python >= 3.7 required
+
+pytest>=7.0  # for running tests with pytest (optional, unittest also works)
