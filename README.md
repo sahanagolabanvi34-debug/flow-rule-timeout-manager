@@ -18,6 +18,8 @@ This project implements an SDN solution using **Mininet** (network emulation) an
 - Receives and logs `EventOFPFlowRemoved` notifications for full lifecycle tracking
 - Demonstrates rule lifecycle via two clearly documented test scenarios
 
+Additionally, a **GUI Dashboard** (`gui.py`) was built to visualise and interact with the flow rule lifecycle — including a live flow table, packet simulator, lifecycle timeline, statistics panel, and behaviour analysis engine.
+
 ---
 
 ## 🏗 Topology
@@ -81,11 +83,12 @@ flow-rule-timeout-manager/
 ├── tests/
 │   ├── __init__.py
 │   └── regression_test.py               ← Regression test suite (9 tests)
-├── screenshots/                         ← Proof of execution
+├── screenshots/                         ← Proof of execution (16 screenshots)
 ├── logs/
 │   ├── controller.log                   ← Runtime event log
 │   └── audit_log.json                   ← Flow removal audit log
 ├── topology.py                          ← Mininet topology + test scenarios
+├── gui.py                               ← GUI Dashboard (SDN visualiser)
 ├── requirements.txt
 └── README.md
 ```
@@ -109,6 +112,8 @@ pip3 install ryu eventlet==0.30.2
 ```bash
 kushal@CNSDN:~$ ryu-manager controller/ryu_flow_timeout_controller.py
 ```
+
+The controller starts, loads `FlowTimeoutController`, waits for switch connection, then installs the table-miss entry and permanent firewall DROP rule for h4 on switch connect.
 
 ### Step 2 — Start Mininet Topology (Terminal 2)
 
@@ -135,6 +140,12 @@ mininet> h1 iperf -c 10.0.0.3
 kushal@CNSDN:~$ python3 tests/regression_test.py
 ```
 
+### Step 5 — GUI Dashboard (Optional)
+
+```bash
+kushal@CNSDN:~$ python3 gui.py
+```
+
 ---
 
 ## 🧪 Test Scenarios
@@ -143,19 +154,10 @@ kushal@CNSDN:~$ python3 tests/regression_test.py
 
 **Goal:** Prove that flow rules are removed after `idle_timeout` seconds of inactivity.
 
-**Steps:**
 1. `h1 ping h2` → triggers `packet_in` → controller installs forwarding rules with `idle_timeout=10s`
 2. Stop traffic → wait 13 seconds
 3. `dump-flows` → forwarding rules are gone (only table-miss + firewall remain)
 4. `h1 ping h2` again → new `packet_in` → fresh rules re-installed
-
-![Idle Timeout Demo](screenshots/05_scenario1_idle_timeout.png)
-
-**Controller logs showing FLOW REMOVED events:**
-
-![Controller Flow Removed](screenshots/06_controller_flow_removed.png)
-
----
 
 ### Scenario 2 — Firewall: Allowed vs Blocked
 
@@ -167,42 +169,162 @@ kushal@CNSDN:~$ python3 tests/regression_test.py
 | Blocked | `h4 ping h1` | 100% packet loss ❌ |
 | Blocked | `h4 ping h2` | 100% packet loss ❌ |
 
-![Firewall Scenario](screenshots/03_scenario2_firewall.png)
+---
 
-**Flow table showing the DROP rule:**
+## 🖥 GUI Dashboard
 
-![Flow Table with Firewall Rule](screenshots/04_flow_table_firewall.png)
+The project includes a full **GUI Dashboard** (`gui.py`) built with Tkinter that simulates and visualises the flow rule lifecycle without needing a live Mininet environment.
+
+| Tab | Description |
+|-----|-------------|
+| **Flow Table** | Live view of all rules with state, timers, packet/byte counters, and age. Auto-refreshes every second. |
+| **Add Rule** | Form to add flow rules with custom match fields (IP, port, protocol), action, priority, and timeout sliders. |
+| **Packet Simulator** | Manually inject packets or run burst simulations against a selected rule. Live packet event log. |
+| **Lifecycle Timeline** | Chronological log of all rule events — ADDED, EXPIRED, REMOVED, PACKET. Filterable by type. |
+| **Statistics** | Live counters (active, idle-expired, hard-expired) + full audit log of all expired/removed rules. |
+| **Analysis** | Automated behaviour analysis experiment — runs 5 controlled scenarios and generates a key findings report. |
+| **Test Runner** | Runs the regression test suite from within the GUI. |
 
 ---
 
 ## 📊 Performance Observation & Analysis
 
-### Controller Startup
+- **First ping RTT** is higher (~2ms) because the packet goes to the controller (`packet_in`) before a rule is installed
+- **Subsequent pings** are much faster (~0.15ms) as they match the installed flow rule at switch line rate
+- **iperf throughput** ~968 Mbits/sec on the virtual link
+- **pingall** shows 50% drop rate — h1/h2/h3 communicate freely, h4 blocked in all directions (expected and correct)
 
-![Controller Start](screenshots/01_ryu_controller_start.png)
+---
 
-### Topology Startup
+## 📸 Proof of Execution
 
-![Topology Start](screenshots/02_topology_start.png)
+---
 
-### pingall — All-Pairs Connectivity
+### 🖧 1. Mininet Topology Start
 
-![pingall Results](screenshots/09_pingall.png)
+4 hosts, 1 switch, remote controller — network ready, automated test scenarios begin:
 
-> h1, h2, h3 communicate freely. h4 is blocked in all directions — 50% drop rate is expected and correct.
+![Topology Start](screenshots/2.png)
 
-### Latency (ping RTT) + Throughput (iperf)
+---
 
-![iperf and ping results](screenshots/07_iperf_results.png)
+### 🔥 2. Scenario 2 — Firewall: Allowed vs Blocked
 
-**Observations:**
-- First ping RTT is higher (~2ms) because the packet goes to the controller (`packet_in`) before a rule is installed
-- Subsequent pings are much faster (~0.15ms) as they match the installed flow rule at switch line rate
-- iperf throughput ~968 Mbits/sec on the virtual link
+h1→h2 = 0% packet loss (ALLOWED) | h4→h1 = 100% packet loss (BLOCKED):
 
-### Regression Tests
+![Firewall Scenario](screenshots/3.png)
 
-![Regression Tests](screenshots/08_regression_tests.png)
+---
+
+### 📋 3. Flow Table with Firewall Rule
+
+priority=200 DROP rule for 10.0.0.4 alongside priority=100 forwarding rules and priority=0 table-miss:
+
+![Flow Table Firewall](screenshots/4.png)
+
+---
+
+### ⏱ 4. Scenario 1 — Idle Timeout Demo
+
+Rules installed → wait 13s → forwarding rules GONE after idle timeout fires:
+
+![Idle Timeout](screenshots/5.png)
+
+---
+
+### 📈 5. iperf Throughput + Latency
+
+968 Mbits/sec throughput | 0% packet loss | 0.083–0.384ms RTT:
+
+![iperf Results](screenshots/7.png)
+
+---
+
+### ✅ 6. Regression Tests
+
+9/9 tests PASS:
+
+![Regression Tests](screenshots/8.png)
+
+---
+
+### 🌐 7. pingall Results
+
+h1/h2/h3 communicate freely, h4 blocked in all directions — 50% drop rate as expected:
+
+![pingall](screenshots/9.png)
+
+---
+
+### 🖥 8. GUI — Add Rule Tab
+
+Match fields, action, priority, and timeout sliders:
+
+![Add Rule](screenshots/10.png)
+
+---
+
+### 📋 9. GUI — Flow Table (2 Active Rules)
+
+Live countdown timers visible for Idle Rem and Hard Rem:
+
+![Flow Table Active](screenshots/11.png)
+
+---
+
+### ⚠️ 10. GUI — Flow Table (Mid-Session)
+
+3 idle-expired, 1 still active with Hard Rem warning:
+
+![Flow Table Expiring](screenshots/12.png)
+
+---
+
+### 💉 11. GUI — Packet Simulator
+
+Burst of 50 packets injected, live packet event log:
+
+![Packet Simulator](screenshots/13.png)
+
+---
+
+### 🗑 12. GUI — Flow Table Empty
+
+All rules expired — Active=0, Idle-Expired=3, Hard-Expired=1:
+
+![Flow Table Empty](screenshots/14.png)
+
+---
+
+### 📜 13. GUI — Lifecycle Timeline (ALL view)
+
+HARD_EXPIRED at top followed by all PACKET events:
+
+![Timeline All](screenshots/15.png)
+
+---
+
+### ➕ 14. GUI — Lifecycle Timeline (ADDED filter)
+
+All 4 rules shown with their idle and hard timeout configs:
+
+![Timeline Added](screenshots/16.png)
+
+---
+
+### 📊 15. GUI — Statistics & Audit Log
+
+Live counters showing 4 total rules added, 3 idle-expired, 1 hard-expired. Audit log records every removal with reason, packet count, and age — this is the GUI equivalent of the controller's `EventOFPFlowRemoved` log:
+
+![Statistics](screenshots/17.png)
+
+---
+
+### 🔬 16. GUI — Behaviour Analysis Experiment
+
+5 controlled scenarios run automatically with key findings report:
+
+![Analysis](screenshots/18.png)
 
 ---
 
