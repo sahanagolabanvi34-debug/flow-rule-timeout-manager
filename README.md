@@ -1,7 +1,7 @@
 # 🌐 Flow Rule Timeout Manager — SDN with Mininet + Ryu
 
 **Computer Networks Project — UE24CS252B**
-**Student:** Kushal G | **SRN:** PES1UG24AM145
+**Student:** SAHANA K GOLABANVI | **SRN:** PES1UG25AM811
 
 ---
 
@@ -362,5 +362,5 @@ Live counters showing 4 total rules added, 3 idle-expired, 1 hard-expired. Audit
 
 ## 👨‍💻 Author
 
-**Kushal G** | PES1UG24AM145
+**Kushal G** | PES1UG25AM811
 Computer Networks — UE24CS252B | PES University
